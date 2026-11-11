@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    # Linux runner, so mcs instead of csc
+    runs-on: docker
+    container:
+      image: node:22-bookworm   # node for checkout, mono comes via apt
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Mono
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            mono-devel libmono-system-windows-forms4.0-cil libmono-system-drawing4.0-cil jq
+
+      - name: Build
+        # same options as build.cmd
+        run: |
+          RES=""
+          for f in lang/*.ini; do RES="$RES -resource:$f,lang.$(basename "$f")"; done
+          mcs -target:winexe -platform:x86 -optimize+ -codepage:utf8 \
+            -r:System.dll -r:System.Core.dll -r:System.Drawing.dll -r:System.Windows.Forms.dll \
+            $RES -out:ThinkPadKbdLight.exe src/*.cs
+
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ThinkPadKbdLight
+          path: ThinkPadKbdLight.exe
+
+      - name: Prepare release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: mkdir -p dist && cp ThinkPadKbdLight.exe dist/
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: https://code.forgejo.org/actions/forgejo-release@v2
+        with:
+          direction: upload
+          release-dir: dist

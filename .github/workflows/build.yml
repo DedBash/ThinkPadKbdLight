@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest   # so build.cmd runs as is
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build
+        shell: cmd
+        run: build.cmd
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ThinkPadKbdLight
+          path: ThinkPadKbdLight.exe
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ThinkPadKbdLight.exe
+          generate_release_notes: true
